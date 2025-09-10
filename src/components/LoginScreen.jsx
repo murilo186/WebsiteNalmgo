@@ -1,13 +1,36 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Eye, EyeOff, Truck, Mail, Lock } from "lucide-react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { useUser } from "../contexts/UserContext";
 
-const LoginPage = () => {
+const LoginPage = ({ onLogin }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { login, loading, error: userError, isLoggedIn } = useUser();
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     email: "",
     password: "",
   });
-  const [isLoading, setIsLoading] = useState(false);
+  const [loginError, setLoginError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+
+  // Verificar se usuário já está logado
+  useEffect(() => {
+    if (isLoggedIn) {
+      navigate("/dashboard");
+    }
+  }, [isLoggedIn, navigate]);
+
+  // Capturar mensagem de sucesso do registro
+  useEffect(() => {
+    if (location.state?.message) {
+      setSuccessMessage(location.state.message);
+      if (location.state?.email) {
+        setFormData(prev => ({ ...prev, email: location.state.email }));
+      }
+    }
+  }, [location.state]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -15,22 +38,43 @@ const LoginPage = () => {
       ...prev,
       [name]: value,
     }));
+    // Limpa erro quando usuário começa a digitar
+    if (loginError) setLoginError("");
+    if (successMessage) setSuccessMessage("");
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsLoading(true);
+    setLoginError("");
+    setSuccessMessage("");
 
-    // Simular chamada à API
-    setTimeout(() => {
-      console.log("Login attempt:", formData);
-      setIsLoading(false);
-      // Aqui você fará a integração com sua API
-    }, 1500);
+    // Validação básica
+    if (!formData.email || !formData.password) {
+      setLoginError("Por favor, preencha todos os campos");
+      return;
+    }
+
+    try {
+      const result = await login(formData.email, formData.password);
+      
+      if (result.success) {
+        // Login bem-sucedido - redirecionamento já é feito pelo useEffect
+        console.log("Login realizado com sucesso");
+      } else {
+        setLoginError(result.error || "Erro ao fazer login");
+      }
+    } catch (err) {
+      console.error("Erro no login:", err);
+      setLoginError("Erro interno. Tente novamente.");
+    }
   };
 
   const togglePasswordVisibility = () => {
     setShowPassword(!showPassword);
+  };
+
+  const goToRegister = () => {
+    navigate("/register");
   };
 
   return (
@@ -54,10 +98,11 @@ const LoginPage = () => {
               </span>
             </div>
             <button
+              onClick={goToRegister}
               className="text-sm hover:opacity-80 transition-opacity"
               style={{ color: "#4B5563" }}
             >
-              Precisa de ajuda?
+              Não tem conta? Cadastre-se
             </button>
           </div>
         </div>
@@ -78,7 +123,21 @@ const LoginPage = () => {
 
           {/* Formulário de Login */}
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-            <div className="space-y-5">
+            <form onSubmit={handleSubmit} className="space-y-5">
+              {/* Mensagem de sucesso */}
+              {successMessage && (
+                <div className="p-3 rounded-lg bg-green-50 border border-green-200">
+                  <p className="text-sm text-green-700">{successMessage}</p>
+                </div>
+              )}
+
+              {/* Mensagem de erro */}
+              {(loginError || userError) && (
+                <div className="p-3 rounded-lg bg-red-50 border border-red-200">
+                  <p className="text-sm text-red-600">{loginError || userError}</p>
+                </div>
+              )}
+
               {/* Campo Email */}
               <div>
                 <label
@@ -183,26 +242,25 @@ const LoginPage = () => {
 
               {/* Botão de Login */}
               <button
-                type="button"
-                disabled={isLoading}
-                onClick={handleSubmit}
+                type="submit"
+                disabled={loading}
                 className="w-full py-2.5 px-4 rounded-lg font-medium text-white transition-all duration-200 hover:shadow-lg disabled:opacity-70 disabled:cursor-not-allowed text-sm"
                 style={{
                   backgroundColor: "#3B82F6",
                   boxShadow: "0 2px 8px rgba(59, 130, 246, 0.2)",
                 }}
                 onMouseEnter={(e) => {
-                  if (!isLoading) {
+                  if (!loading) {
                     e.target.style.backgroundColor = "#2563EB";
                   }
                 }}
                 onMouseLeave={(e) => {
-                  if (!isLoading) {
+                  if (!loading) {
                     e.target.style.backgroundColor = "#3B82F6";
                   }
                 }}
               >
-                {isLoading ? (
+                {loading ? (
                   <div className="flex items-center justify-center">
                     <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
                     Entrando...
@@ -211,7 +269,7 @@ const LoginPage = () => {
                   "Entrar"
                 )}
               </button>
-            </div>
+            </form>
           </div>
 
           {/* Link para Cadastro */}
@@ -220,8 +278,9 @@ const LoginPage = () => {
               Ainda não tem uma conta?{" "}
               <button
                 type="button"
-                className="font-medium opacity-50 hover:opacity-80 transition-opacity text-xs underline"
-                style={{ color: "#4B5563" }}
+                onClick={goToRegister}
+                className="font-medium hover:opacity-80 transition-opacity text-xs underline"
+                style={{ color: "#3B82F6" }}
               >
                 Cadastrar empresa
               </button>

@@ -14,11 +14,16 @@ import {
   ArrowLeft,
   Check,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { useUser } from "../contexts/UserContext";
 
-const RegisterPage = () => {
+const RegisterPage = ({ onRegister }) => {
+  const navigate = useNavigate();
+  const { register, login, loading, error } = useUser();
   const [currentStep, setCurrentStep] = useState(1);
   const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [registerError, setRegisterError] = useState("");
+  const [autoLogin, setAutoLogin] = useState(true); // Para controlar se deve fazer login automático
 
   const [formData, setFormData] = useState({
     // Etapa 1
@@ -90,13 +95,67 @@ const RegisterPage = () => {
     }
   };
 
-  const handleSubmit = () => {
-    setIsLoading(true);
-    setTimeout(() => {
-      console.log("Cadastro completo:", formData);
-      setIsLoading(false);
-      // Aqui você fará a integração com sua API
-    }, 2000);
+  const handleSubmit = async () => {
+    try {
+      setRegisterError("");
+      
+      // Validar se as senhas coincidem
+      if (formData.password !== formData.confirmPassword) {
+        setRegisterError("As senhas não coincidem");
+        return;
+      }
+      
+      // Montar dados apenas com campos obrigatórios
+    const empresaData = {
+  nomeEmpresa: formData.companyName,        // ✅ companyName -> nomeEmpresa
+  senha: formData.password,                 // ✅ password -> senha
+  emailCorporativo: formData.corporateEmail, // ✅ corporateEmail -> emailCorporativo
+  cnpj: formData.cnpj,                      // ✅ OK
+  nomeAdministrador: formData.adminName,    // ✅ adminName -> nomeAdministrador
+  cpfAdministrador: formData.adminCpf       // ✅ adminCpf -> cpfAdministrador
+};
+      console.log("Enviando dados para registro:", empresaData);
+      
+      const result = await register(empresaData);
+      
+      if (result.success) {
+        if (autoLogin) {
+          // Fazer login automático após registro
+          console.log("Fazendo login automático após registro...");
+          const loginResult = await login(formData.corporateEmail, formData.password);
+          
+          if (loginResult.success) {
+            // Login automático bem-sucedido - redirecionar para dashboard
+            navigate("/dashboard");
+          } else {
+            // Se falhou o login automático, redirecionar para login manual
+            navigate("/login", { 
+              state: { 
+                message: "Empresa cadastrada com sucesso! Faça login para continuar.",
+                email: formData.corporateEmail 
+              }
+            });
+          }
+        } else {
+          // Não fazer login automático - ir para tela de login
+          navigate("/login", { 
+            state: { 
+              message: "Empresa cadastrada com sucesso! Faça login para continuar.",
+              email: formData.corporateEmail 
+            }
+          });
+        }
+      } else {
+        setRegisterError(result.error || "Erro ao cadastrar empresa");
+      }
+    } catch (err) {
+      console.error("Erro no cadastro:", err);
+      setRegisterError("Erro interno. Tente novamente.");
+    }
+  };
+
+  const goToLogin = () => {
+    navigate("/login");
   };
 
   const renderStep1 = () => (
@@ -476,6 +535,27 @@ const RegisterPage = () => {
             <option value="RS">RS</option>
             <option value="PR">PR</option>
             <option value="SC">SC</option>
+            <option value="ES">ES</option>
+            <option value="BA">BA</option>
+            <option value="GO">GO</option>
+            <option value="DF">DF</option>
+            <option value="MT">MT</option>
+            <option value="MS">MS</option>
+            <option value="TO">TO</option>
+            <option value="PA">PA</option>
+            <option value="AP">AP</option>
+            <option value="RR">RR</option>
+            <option value="AM">AM</option>
+            <option value="AC">AC</option>
+            <option value="RO">RO</option>
+            <option value="PE">PE</option>
+            <option value="AL">AL</option>
+            <option value="SE">SE</option>
+            <option value="PB">PB</option>
+            <option value="RN">RN</option>
+            <option value="CE">CE</option>
+            <option value="PI">PI</option>
+            <option value="MA">MA</option>
           </select>
         </div>
       </div>
@@ -544,6 +624,23 @@ const RegisterPage = () => {
         </p>
       </div>
 
+      {/* Opção de login automático */}
+      <div className="flex items-start space-x-3 mt-4">
+        <input
+          id="autoLogin"
+          type="checkbox"
+          checked={autoLogin}
+          onChange={(e) => setAutoLogin(e.target.checked)}
+          className="mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+        />
+        <label htmlFor="autoLogin" className="text-sm" style={{ color: "#222222" }}>
+          Fazer login automaticamente após o cadastro
+          <p className="text-xs mt-0.5" style={{ color: "#4B5563" }}>
+            Se desmarcado, você será redirecionado para a tela de login
+          </p>
+        </label>
+      </div>
+
       <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 mt-6">
         <div className="flex items-start space-x-3">
           <Check className="h-5 w-5 text-blue-600 mt-0.5" />
@@ -595,6 +692,7 @@ const RegisterPage = () => {
               </span>
             </div>
             <button
+              onClick={goToLogin}
               className="text-sm hover:opacity-80 transition-opacity"
               style={{ color: "#4B5563" }}
             >
@@ -650,6 +748,13 @@ const RegisterPage = () => {
 
           {/* Formulário */}
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+            {/* Erro de registro */}
+            {(registerError || error) && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-700">{registerError || error}</p>
+              </div>
+            )}
+            
             {currentStep === 1 && renderStep1()}
             {currentStep === 2 && renderStep2()}
             {currentStep === 3 && renderStep3()}
@@ -683,12 +788,12 @@ const RegisterPage = () => {
               ) : (
                 <button
                   type="button"
-                  disabled={isLoading}
+                  disabled={loading}
                   onClick={handleSubmit}
                   className="flex items-center px-6 py-2.5 rounded-lg font-medium text-white text-sm hover:shadow-lg disabled:opacity-70 disabled:cursor-not-allowed transition-all"
                   style={{ backgroundColor: "#8B5CF6" }}
                 >
-                  {isLoading ? (
+                  {loading ? (
                     <>
                       <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
                       Finalizando...
@@ -710,6 +815,7 @@ const RegisterPage = () => {
               Já tem uma conta?{" "}
               <button
                 type="button"
+                onClick={goToLogin}
                 className="font-medium hover:opacity-80 transition-opacity underline"
                 style={{ color: "#3B82F6" }}
               >

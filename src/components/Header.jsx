@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useUser } from "../contexts/UserContext";
 import {
   Truck,
   ChevronDown,
@@ -9,9 +10,10 @@ import {
   LogOut,
 } from "lucide-react";
 
-const Header = ({ companyName }) => {
+const Header = ({ companyName, onLogout }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { logout, userData, companyName: userCompanyName, userName } = useUser();
 
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -24,7 +26,30 @@ const Header = ({ companyName }) => {
     { id: 3, text: "Frete finalizado com sucesso", time: "1 hora atrás" },
   ];
 
-  const userProfile = { name: "João Silva" };
+  const userProfile = { 
+    name: userName || userData?.nome_administrador || "Usuário" 
+  };
+  
+  const displayCompanyName = companyName || userCompanyName || userData?.nome_empresa || "Empresa";
+
+  // Função para fazer logout
+  const handleLogout = () => {
+    // Fecha todos os menus
+    setUserMenuOpen(false);
+    setNotificationsOpen(false);
+    setStatusMenuOpen(false);
+    
+    // Usa o logout do UserContext
+    logout();
+    
+    // Redireciona para login
+    navigate("/login");
+    
+    // Chama a função de logout passada pelo App se existir
+    if (onLogout) {
+      onLogout();
+    }
+  };
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -64,7 +89,7 @@ const Header = ({ companyName }) => {
                   NALM GO
                 </span>
                 <p className="text-sm" style={{ color: "#4B5563" }}>
-                  {companyName}
+                  {displayCompanyName}
                 </p>
               </div>
             </div>
@@ -208,7 +233,12 @@ const Header = ({ companyName }) => {
                     <span style={{ color: "#222222" }}>Editar Perfil</span>
                   </button>
                   <hr className="my-1 border-gray-200" />
-                  <button className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center space-x-2">
+                  
+                  {/* Botão de Logout atualizado */}
+                  <button 
+                    onClick={handleLogout}
+                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center space-x-2"
+                  >
                     <LogOut className="h-4 w-4" style={{ color: "#EF4444" }} />
                     <span style={{ color: "#EF4444" }}>Sair</span>
                   </button>
