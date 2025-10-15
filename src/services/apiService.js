@@ -2,15 +2,15 @@
 class ApiService {
   constructor() {
     // Usa variável de ambiente ou fallback para localhost
-    this.baseURL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-    console.log('🚀 API Base URL:', this.baseURL);
+    this.baseURL = import.meta.env.VITE_API_URL;
+    console.log("🚀 API Base URL:", this.baseURL);
   }
 
   // Método auxiliar para fazer requests
   async request(endpoint, options = {}) {
     const config = {
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
         ...options.headers,
       },
       ...options,
@@ -21,7 +21,7 @@ class ApiService {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Erro na requisição');
+        throw new Error(data.error || "Erro na requisição");
       }
 
       return data;
@@ -33,25 +33,25 @@ class ApiService {
 
   // Métodos HTTP básicos
   async get(endpoint) {
-    return this.request(endpoint, { method: 'GET' });
+    return this.request(endpoint, { method: "GET" });
   }
 
   async post(endpoint, data) {
     return this.request(endpoint, {
-      method: 'POST',
-      body: JSON.stringify(data)
+      method: "POST",
+      body: JSON.stringify(data),
     });
   }
 
   async put(endpoint, data) {
     return this.request(endpoint, {
-      method: 'PUT',
-      body: JSON.stringify(data)
+      method: "PUT",
+      body: JSON.stringify(data),
     });
   }
 
   async delete(endpoint) {
-    return this.request(endpoint, { method: 'DELETE' });
+    return this.request(endpoint, { method: "DELETE" });
   }
 
   // ===================================
@@ -59,16 +59,16 @@ class ApiService {
   // ===================================
 
   async registerEmpresa(empresaData) {
-    return this.request('/api/auth/register-empresa', {
-      method: 'POST',
-      body: JSON.stringify(empresaData)
+    return this.request("/api/auth/register-empresa", {
+      method: "POST",
+      body: JSON.stringify(empresaData),
     });
   }
 
   async loginEmpresa(email, senha) {
-    return this.request('/api/auth/login-empresa', {
-      method: 'POST',
-      body: JSON.stringify({ email, senha })
+    return this.request("/api/auth/login-empresa", {
+      method: "POST",
+      body: JSON.stringify({ email, senha }),
     });
   }
 
@@ -82,9 +82,9 @@ class ApiService {
 
   // Criar novo frete
   async criarFrete(freteData) {
-    return this.request('/api/fretes', {
-      method: 'POST',
-      body: JSON.stringify(freteData)
+    return this.request("/api/fretes", {
+      method: "POST",
+      body: JSON.stringify(freteData),
     });
   }
 
@@ -101,32 +101,32 @@ class ApiService {
   // Atualizar frete
   async atualizarFrete(freteId, freteData) {
     return this.request(`/api/fretes/${freteId}`, {
-      method: 'PUT',
-      body: JSON.stringify(freteData)
+      method: "PUT",
+      body: JSON.stringify(freteData),
     });
   }
 
   // Deletar frete
   async deletarFrete(freteId, empresaId) {
     return this.request(`/api/fretes/${freteId}`, {
-      method: 'DELETE',
-      body: JSON.stringify({ empresaId })
+      method: "DELETE",
+      body: JSON.stringify({ empresaId }),
     });
   }
 
   // Oferecer frete para motorista
   async oferecerFrete(freteId, motoristaId, empresaId) {
     return this.request(`/api/fretes/${freteId}/oferecer`, {
-      method: 'POST',
-      body: JSON.stringify({ motoristaId, empresaId })
+      method: "POST",
+      body: JSON.stringify({ motoristaId, empresaId }),
     });
   }
 
   // Finalizar frete
-  async finalizarFrete(freteId, empresaId, finalizadoPor = 'Admin') {
+  async finalizarFrete(freteId, empresaId, finalizadoPor = "Admin") {
     return this.request(`/api/fretes/${freteId}/finalizar`, {
-      method: 'PUT',
-      body: JSON.stringify({ empresaId, finalizadoPor })
+      method: "PUT",
+      body: JSON.stringify({ empresaId, finalizadoPor }),
     });
   }
 
@@ -136,12 +136,12 @@ class ApiService {
 
   // Enviar convite para motorista por código
   async enviarConvite(empresaId, codigoMotorista) {
-    return this.request('/api/convites', {
-      method: 'POST',
+    return this.request("/api/convites", {
+      method: "POST",
       body: JSON.stringify({
         empresaId,
-        codigoMotorista: codigoMotorista.toUpperCase()
-      })
+        codigoMotorista: codigoMotorista.toUpperCase(),
+      }),
     });
   }
 
@@ -155,11 +155,11 @@ class ApiService {
     const response = await this.getMotoristasEmpresa(empresaId);
     if (response.success) {
       const motoristasLivres = response.motoristas.filter(
-        m => m.status_disponibilidade === 'livre' && m.ativo
+        (m) => m.status_disponibilidade === "livre" && m.ativo
       );
       return {
         ...response,
-        motoristas: motoristasLivres
+        motoristas: motoristasLivres,
       };
     }
     return response;
@@ -176,32 +176,32 @@ class ApiService {
 
   // Criar novo colaborador
   async criarColaborador(colaboradorData) {
-    return this.request('/api/auth/colaboradores', {
-      method: 'POST',
-      body: JSON.stringify(colaboradorData)
+    return this.request("/api/auth/colaboradores", {
+      method: "POST",
+      body: JSON.stringify(colaboradorData),
     });
   }
 
   // Atualizar colaborador
   async atualizarColaborador(colaboradorId, colaboradorData) {
     return this.request(`/api/auth/colaboradores/${colaboradorId}`, {
-      method: 'PUT',
-      body: JSON.stringify(colaboradorData)
+      method: "PUT",
+      body: JSON.stringify(colaboradorData),
     });
   }
 
   // Deletar colaborador
   async deletarColaborador(colaboradorId) {
     return this.request(`/api/auth/colaboradores/${colaboradorId}`, {
-      method: 'DELETE'
+      method: "DELETE",
     });
   }
 
   // Atualizar status de trabalho do colaborador
   async atualizarStatusTrabalho(colaboradorId, statusTrabalho) {
     return this.request(`/api/colaboradores/${colaboradorId}/status`, {
-      method: 'PUT',
-      body: JSON.stringify({ status_trabalho: statusTrabalho })
+      method: "PUT",
+      body: JSON.stringify({ status_trabalho: statusTrabalho }),
     });
   }
 
@@ -217,8 +217,8 @@ class ApiService {
   // Atualizar dados da empresa
   async updateEmpresaData(empresaId, empresaData) {
     return this.request(`/api/empresas/${empresaId}`, {
-      method: 'PUT',
-      body: JSON.stringify(empresaData)
+      method: "PUT",
+      body: JSON.stringify(empresaData),
     });
   }
 
@@ -241,7 +241,7 @@ class ApiService {
     const params = new URLSearchParams({
       empresaId,
       dataInicio,
-      dataFim
+      dataFim,
     });
     return this.request(`/api/fretes/empresa/${empresaId}/relatorio?${params}`);
   }
@@ -253,10 +253,15 @@ class ApiService {
       const motoristas = response.motoristas;
       const stats = {
         total: motoristas.length,
-        livres: motoristas.filter(m => m.status_disponibilidade === 'livre').length,
-        emServico: motoristas.filter(m => m.status_disponibilidade === 'em-frete').length,
-        indisponiveis: motoristas.filter(m => m.status_disponibilidade === 'indisponivel').length,
-        ativos: motoristas.filter(m => m.ativo).length
+        livres: motoristas.filter((m) => m.status_disponibilidade === "livre")
+          .length,
+        emServico: motoristas.filter(
+          (m) => m.status_disponibilidade === "em-frete"
+        ).length,
+        indisponiveis: motoristas.filter(
+          (m) => m.status_disponibilidade === "indisponivel"
+        ).length,
+        ativos: motoristas.filter((m) => m.ativo).length,
       };
       return { success: true, stats };
     }
@@ -274,14 +279,14 @@ class ApiService {
 
   // Calcular distância entre cidades
   async calcularDistancia(origem, destino) {
-    return this.request('/api/fretes/calcular-distancia', {
-      method: 'POST',
-      body: JSON.stringify({ origem, destino })
+    return this.request("/api/fretes/calcular-distancia", {
+      method: "POST",
+      body: JSON.stringify({ origem, destino }),
     });
   }
 
   // Buscar dados de receita por período
-  async getReceitaPorPeriodo(empresaId, periodo = '6meses') {
+  async getReceitaPorPeriodo(empresaId, periodo = "6meses") {
     return this.request(`/api/fretes/receita/${empresaId}?periodo=${periodo}`);
   }
 
@@ -294,14 +299,16 @@ class ApiService {
     try {
       const [fretes, motoristas] = await Promise.all([
         this.getFretes(empresaId),
-        this.getMotoristasEmpresa(empresaId)
+        this.getMotoristasEmpresa(empresaId),
       ]);
 
       const resultado = {
         success: true,
-        fretes: fretes.success ? fretes.fretes : { pendentes: [], andamento: [], finalizados: [] },
+        fretes: fretes.success
+          ? fretes.fretes
+          : { pendentes: [], andamento: [], finalizados: [] },
         motoristas: motoristas.success ? motoristas.motoristas : [],
-        estatisticas: {}
+        estatisticas: {},
       };
 
       // Calcular estatísticas
@@ -312,20 +319,22 @@ class ApiService {
           pendentes: pendentes.length,
           andamento: andamento.length,
           finalizados: finalizados.length,
-          valorTotal: [...pendentes, ...andamento, ...finalizados]
-            .reduce((total, frete) => total + (Number(frete.valor) || 0), 0)
+          valorTotal: [...pendentes, ...andamento, ...finalizados].reduce(
+            (total, frete) => total + (Number(frete.valor) || 0),
+            0
+          ),
         };
       }
 
       return resultado;
     } catch (error) {
-      console.error('Erro ao carregar dados completos de fretes:', error);
+      console.error("Erro ao carregar dados completos de fretes:", error);
       return {
         success: false,
         error: error.message,
         fretes: { pendentes: [], andamento: [], finalizados: [] },
         motoristas: [],
-        estatisticas: {}
+        estatisticas: {},
       };
     }
   }
@@ -336,21 +345,21 @@ class ApiService {
     const erros = [];
 
     if (!origem || origem.trim().length < 3) {
-      erros.push('Origem deve ter pelo menos 3 caracteres');
+      erros.push("Origem deve ter pelo menos 3 caracteres");
     }
     if (!destino || destino.trim().length < 3) {
-      erros.push('Destino deve ter pelo menos 3 caracteres');
+      erros.push("Destino deve ter pelo menos 3 caracteres");
     }
     if (!valor || isNaN(Number(valor)) || Number(valor) <= 0) {
-      erros.push('Valor deve ser um número positivo');
+      erros.push("Valor deve ser um número positivo");
     }
     if (!tipoCarga || tipoCarga.trim().length < 3) {
-      erros.push('Tipo de carga deve ter pelo menos 3 caracteres');
+      erros.push("Tipo de carga deve ter pelo menos 3 caracteres");
     }
 
     return {
       valido: erros.length === 0,
-      erros
+      erros,
     };
   }
 
@@ -361,11 +370,16 @@ class ApiService {
       origem: formData.origem.trim(),
       destino: formData.destino.trim(),
       distancia: formData.distancia ? formData.distancia.trim() : null,
-      valor: Number(formData.valor.toString().replace(/[R$\s,]/g, '').replace(/\./g, '')),
+      valor: Number(
+        formData.valor
+          .toString()
+          .replace(/[R$\s,]/g, "")
+          .replace(/\./g, "")
+      ),
       tipoCarga: formData.carga.trim(),
       peso: formData.peso ? formData.peso.trim() : null,
       eixosRequeridos: Number(formData.eixosRequerido) || 3,
-      observacoes: formData.observacoes ? formData.observacoes.trim() : null
+      observacoes: formData.observacoes ? formData.observacoes.trim() : null,
     };
   }
 
@@ -374,8 +388,8 @@ class ApiService {
   // ===================================
 
   formatarValor(valor) {
-    if (typeof valor === 'number') {
-      return `R$ ${valor.toFixed(2).replace('.', ',')}`;
+    if (typeof valor === "number") {
+      return `R$ ${valor.toFixed(2).replace(".", ",")}`;
     }
     return valor;
   }
@@ -383,7 +397,7 @@ class ApiService {
   formatarData(dataString) {
     try {
       const data = new Date(dataString);
-      return data.toLocaleDateString('pt-BR');
+      return data.toLocaleDateString("pt-BR");
     } catch (error) {
       return dataString;
     }
@@ -392,7 +406,7 @@ class ApiService {
   formatarDataHora(dataString) {
     try {
       const data = new Date(dataString);
-      return data.toLocaleString('pt-BR');
+      return data.toLocaleString("pt-BR");
     } catch (error) {
       return dataString;
     }
@@ -410,16 +424,16 @@ class ApiService {
   // Aprovar candidatura
   async aprovarCandidatura(candidaturaId, observacoes = null) {
     return this.request(`/api/candidaturas/${candidaturaId}/aprovar`, {
-      method: 'PUT',
-      body: JSON.stringify({ observacoes })
+      method: "PUT",
+      body: JSON.stringify({ observacoes }),
     });
   }
 
   // Recusar candidatura
   async recusarCandidatura(candidaturaId, observacoes = null) {
     return this.request(`/api/candidaturas/${candidaturaId}/recusar`, {
-      method: 'PUT',
-      body: JSON.stringify({ observacoes })
+      method: "PUT",
+      body: JSON.stringify({ observacoes }),
     });
   }
 
@@ -430,9 +444,9 @@ class ApiService {
 
   // Buscar candidaturas de múltiplos fretes (para badges)
   async getCandidaturasFretes(freteIds) {
-    return this.request('/api/candidaturas/fretes/batch', {
-      method: 'POST',
-      body: JSON.stringify({ freteIds })
+    return this.request("/api/candidaturas/fretes/batch", {
+      method: "POST",
+      body: JSON.stringify({ freteIds }),
     });
   }
 
@@ -454,9 +468,11 @@ class ApiService {
 
   async deleteFrete(freteId) {
     // Nota: Este método precisa do empresaId, mas mantemos para compatibilidade
-    console.warn('deleteFrete sem empresaId está depreciado. Use deletarFrete()');
+    console.warn(
+      "deleteFrete sem empresaId está depreciado. Use deletarFrete()"
+    );
     return this.request(`/api/fretes/${freteId}`, {
-      method: 'DELETE'
+      method: "DELETE",
     });
   }
 
@@ -465,12 +481,12 @@ class ApiService {
   }
 
   async addMembroEquipe(empresaId, membroData) {
-    return this.request('/api/equipe', {
-      method: 'POST',
+    return this.request("/api/equipe", {
+      method: "POST",
       body: JSON.stringify({
         empresaId,
-        ...membroData
-      })
+        ...membroData,
+      }),
     });
   }
 
