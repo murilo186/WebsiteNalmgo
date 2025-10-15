@@ -24,7 +24,28 @@ class AuthService {
   }
 
   // Fazer logout
-  logout() {
+  async logout() {
+    const userData = this.getUserData();
+    
+    // Chamar API de logout se usuário estiver logado
+    if (userData) {
+      try {
+        await fetch('http://localhost:3000/api/auth/logout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: userData.id,
+            userType: userData.tipo === 'empresa' ? 'empresa' : 'colaborador'
+          })
+        });
+        console.log('✅ Logout enviado para servidor');
+      } catch (error) {
+        console.error('❌ Erro ao fazer logout no servidor:', error);
+        // Continue com logout local mesmo se API falhar
+      }
+    }
+    
+    // Limpar dados locais
     localStorage.removeItem(this.USER_KEY);
     localStorage.removeItem(this.TOKEN_KEY);
   }
@@ -36,10 +57,30 @@ class AuthService {
       
       if (response.success) {
         // Salvar dados do usuário
-        const userData = {
-          ...response.empresa,
-          tipo: 'empresa'
-        };
+        let userData;
+        
+        if (response.colaborador) {
+          // Login como colaborador
+          userData = {
+            id: response.colaborador.id,
+            nome: response.colaborador.nome,
+            email: response.colaborador.email,
+            cargo: response.colaborador.cargo,
+            is_admin: response.colaborador.is_admin,
+            empresa_id: response.colaborador.empresa_id,
+            nome_empresa: response.empresa.nome_empresa,
+            status_trabalho: response.colaborador.status_trabalho || 'online',
+            tipo: 'colaborador'
+          };
+        } else {
+          // Login como admin da empresa
+          userData = {
+            ...response.empresa,
+            nome: response.empresa.nome_administrador,
+            tipo: 'empresa'
+          };
+        }
+        
         this.saveUserData(userData);
         
         return {

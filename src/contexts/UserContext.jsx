@@ -15,8 +15,11 @@ export const UserProvider = ({ children }) => {
       setLoading(true);
       setError(null);
       const result = await authService.loginEmpresa(email, senha);
-      
+
+      console.log("Resultado do authService.loginEmpresa:", result);
+
       if (result.success) {
+        console.log("User data do result:", result.user);
         setUserData(result.user);
         return { success: true, message: result.message };
       } else {
@@ -49,10 +52,17 @@ export const UserProvider = ({ children }) => {
   };
 
   // Função para logout
-  const logout = () => {
-    authService.logout();
-    setUserData(null);
-    setError(null);
+  const logout = async () => {
+    try {
+      await authService.logout();
+      setUserData(null);
+      setError(null);
+    } catch (error) {
+      console.error('Erro no logout:', error);
+      // Limpa dados locais mesmo se API falhar
+      setUserData(null);
+      setError(null);
+    }
   };
 
   // Função para atualizar dados do usuário
@@ -60,6 +70,16 @@ export const UserProvider = ({ children }) => {
     const updatedData = authService.updateUserData(newData);
     if (updatedData) {
       setUserData(updatedData);
+    }
+  };
+
+  // Função para atualizar status de trabalho do usuário
+  const updateStatusTrabalho = (novoStatus) => {
+    if (userData) {
+      const updatedData = { ...userData, status_trabalho: novoStatus };
+      setUserData(updatedData);
+      // Atualizar também no localStorage
+      authService.updateUserData(updatedData);
     }
   };
 
@@ -96,12 +116,14 @@ export const UserProvider = ({ children }) => {
     register,
     logout,
     updateUser,
+    updateStatusTrabalho,
     
     // Estados derivados
     isLoggedIn: !!userData,
     companyName: userData?.nome_empresa || "",
-    userName: userData?.nome_administrador || "",
-    userEmail: userData?.email_corporativo || "",
+    userName: userData?.nome || userData?.nome_administrador || "",
+    userEmail: userData?.email || userData?.email_corporativo || "",
+    empresaId: userData?.empresa_id || userData?.id || null,
   };
 
   return (

@@ -5,6 +5,7 @@ import Dashboard from "./components/Dashboard";
 import FretesPage from "./components/ShipScreen";
 import GestaoEquipe from "./components/TeamScreen";
 import EncontrarMotorista from "./components/DriverPage";
+import EmpresaScreen from "./components/empresa/EmpresaScreen";
 import LoginPage from "./components/LoginScreen";
 import RegisterPage from "./components/RegisterScreen";
 
@@ -20,6 +21,7 @@ function App() {
           <Route path="/fretes" element={<FretesPage />} />
           <Route path="/equipe" element={<GestaoEquipe />} />
           <Route path="/motoristas" element={<EncontrarMotorista />} />
+          <Route path="/empresa" element={<EmpresaScreen />} />
         </Routes>
       </Router>
     </UserProvider>

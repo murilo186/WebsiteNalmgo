@@ -1,0 +1,7 @@
+# Arquivo de fallback para compatibilidade com diferentes hosts
+# (Render usa _redirects, mas este serve como backup)
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

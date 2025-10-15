@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run dev:*)",
+      "Read(//c/nalmgoo/backend/**)",
+      "Read(//c/nalmgoo/**)",
+      "Bash(find:*)",
+      "Bash(tree:*)",
+      "Bash(sed:*)",
+      "Bash(curl:*)",
+      "Bash(cat:*)",
+      "Bash(git -C \"/c/nalmgoo/MotoristaApp\" checkout -- src/screens/MapaScreen.js)",
+      "Bash(git -C \"/c/nalmgoo/MotoristaApp\" checkout HEAD -- src/screens/MapaScreen.js)",
+      "Bash(node:*)",
+      "Bash(npx expo start:*)",
+      "Bash(npm start)",
+      "Bash(npx expo install:*)",
+      "Bash(python3:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

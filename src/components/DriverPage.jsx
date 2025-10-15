@@ -1,625 +1,831 @@
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import Header from "./Header";
-import React, { useState, useEffect } from "react";
+import { useUser } from "../contexts/UserContext";
+import apiService from "../services/apiService";
 import {
-  FiSearch,
-  FiMapPin,
-  FiTruck,
-  FiStar,
-  FiFilter,
-  FiEye,
-  FiSend,
-  FiPhone,
-  FiCalendar,
-  FiDollarSign,
-  FiBell,
-} from "react-icons/fi";
+  Search,
+  Filter,
+  MapPin,
+  Phone,
+  Mail,
+  User,
+  Truck,
+  Star,
+  Clock,
+  CheckCircle,
+  AlertCircle,
+  Plus,
+  Navigation,
+  X,
+  Package,
+  DollarSign,
+  Map,
+  List,
+} from "lucide-react";
 
-const EncontrarMotorista = () => {
-  
-  const [filtros, setFiltros] = useState({
-    origem: "",
-    destino: "",
-    tipoVeiculo: "",
-    eixos: "",
-    raioKm: 50,
-  });
+const DriverPage = () => {
+  const navigate = useNavigate();
+  const { user, empresaId, isLoggedIn } = useUser();
+  const [motoristas, setMotoristas] = useState([]);
+  const [filteredMotoristas, setFilteredMotoristas] = useState([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedRaio, setSelectedRaio] = useState(30);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const [mostrarFiltros, setMostrarFiltros] = useState(false);
-  const [motoristaSelecionado, setMotoristaSelecionado] = useState(null);
-  const [showOfertaModal, setShowOfertaModal] = useState(false);
-
-  // Mock data de motoristas terceirizados disponíveis
-  const [motoristas] = useState([
-    {
-      id: 1,
-      nome: "Carlos Silva",
-      foto: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face",
-      avaliacao: 4.8,
-      totalAvaliacoes: 127,
-      localizacao: "Santos, SP",
-      distancia: 12,
-      veiculo: {
-        modelo: "Scania R450",
-        placa: "ABC-1234",
-        eixos: 3,
-        capacidade: "25 ton",
-        ano: 2020,
-      },
-      preco: "R$ 2,50/km",
-      disponibilidade: "Disponível agora",
-      especialidades: ["Carga Seca", "Refrigerada"],
-      telefone: "(13) 99999-9999",
-      ultimaViagem: "2 dias atrás",
-      status: "online",
-    },
-    {
-      id: 2,
-      nome: "Maria Santos",
-      foto: "https://images.unsplash.com/photo-1494790108755-2616b612b789?w=150&h=150&fit=crop&crop=face",
-      avaliacao: 4.9,
-      totalAvaliacoes: 89,
-      localizacao: "São Paulo, SP",
-      distancia: 25,
-      veiculo: {
-        modelo: "Volvo FH540",
-        placa: "XYZ-5678",
-        eixos: 4,
-        capacidade: "30 ton",
-        ano: 2021,
-      },
-      preco: "R$ 2,80/km",
-      disponibilidade: "Disponível hoje",
-      especialidades: ["Carga Perigosa", "Granéis"],
-      telefone: "(11) 88888-8888",
-      ultimaViagem: "1 dia atrás",
-      status: "online",
-    },
-    {
-      id: 3,
-      nome: "João Oliveira",
-      foto: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face",
-      avaliacao: 4.6,
-      totalAvaliacoes: 203,
-      localizacao: "Campinas, SP",
-      distancia: 45,
-      veiculo: {
-        modelo: "Mercedes Actros",
-        placa: "DEF-9012",
-        eixos: 5,
-        capacidade: "40 ton",
-        ano: 2019,
-      },
-      preco: "R$ 2,30/km",
-      disponibilidade: "Disponível amanhã",
-      especialidades: ["Container", "Carga Pesada"],
-      telefone: "(19) 77777-7777",
-      ultimaViagem: "5 dias atrás",
-      status: "away",
-    },
-  ]);
-
-  const [motoristasFiltrados, setMotoristasFiltrados] = useState(motoristas);
-
-  // Filtrar motoristas
+  // Proteção de rota - redirecionar se não estiver logado
   useEffect(() => {
-    let resultado = motoristas;
-
-    if (filtros.tipoVeiculo) {
-      resultado = resultado.filter((m) =>
-        m.veiculo.modelo
-          .toLowerCase()
-          .includes(filtros.tipoVeiculo.toLowerCase())
-      );
+    if (!isLoggedIn) {
+      navigate("/login", { replace: true });
     }
+  }, [isLoggedIn, navigate]);
 
-    if (filtros.eixos) {
-      resultado = resultado.filter(
-        (m) => m.veiculo.eixos >= parseInt(filtros.eixos)
+  // Estados do modal de oferecer frete
+  const [showOfertaModal, setShowOfertaModal] = useState(false);
+  const [motoristaSelected, setMotoristaSelected] = useState(null);
+  const [fretes, setFretes] = useState([]);
+  const [loadingFretes, setLoadingFretes] = useState(false);
+  const [loadingOferta, setLoadingOferta] = useState(false);
+
+  // Estados do mapa
+  const [showMap, setShowMap] = useState(false);
+  const mapRef = useRef(null);
+  const [map, setMap] = useState(null);
+  const [empresaLocation, setEmpresaLocation] = useState(null);
+  const [loadingMap, setLoadingMap] = useState(false);
+
+  // Carregar motoristas próximos disponíveis
+  const loadMotoristasPróximos = async () => {
+    console.log("=== DEBUG loadMotoristasPróximos ===");
+    console.log("User completo:", user);
+
+    // Usar empresa do contexto (mesma que EmpresaScreen)
+    const currentEmpresaId = empresaId || user?.empresa?.id || 1;
+    console.log("✅ Usando empresa ID:", currentEmpresaId, "Raio:", selectedRaio);
+    setLoading(true);
+    setError("");
+
+    try {
+      const response = await apiService.get(
+        `/api/proximidade/empresa/${currentEmpresaId}/motoristas?raio=${selectedRaio}`
       );
+
+      if (response.success) {
+        // Filtrar apenas motoristas disponíveis
+        const motoristasDisponiveis = response.motoristas.filter(
+          m => m.status_disponibilidade === 'livre'
+        );
+        setMotoristas(motoristasDisponiveis);
+        setFilteredMotoristas(motoristasDisponiveis);
+        console.log(`✅ Encontrados ${motoristasDisponiveis.length} motoristas disponíveis em ${selectedRaio}km`);
+      } else {
+        setError("Nenhum motorista disponível encontrado próximo");
+      }
+    } catch (err) {
+      console.error("Erro ao buscar motoristas:", err);
+      setError("Erro ao conectar com o servidor");
+    } finally {
+      setLoading(false);
     }
-
-    setMotoristasFiltrados(resultado);
-  }, [filtros, motoristas]);
-
-  const abrirPerfilMotorista = (motorista) => {
-    setMotoristaSelecionado(motorista);
   };
 
-  const fecharPerfilMotorista = () => {
-    setMotoristaSelecionado(null);
+  useEffect(() => {
+    console.log("=== useEffect disparado ===");
+    console.log("User mudou:", user);
+    loadMotoristasPróximos();
+  }, [user, empresaId, selectedRaio]);
+
+  // Debug adicional - executar sempre
+  useEffect(() => {
+    console.log("=== UserContext Debug ===");
+    console.log("User atual:", user);
+
+    // Verificar localStorage
+    const token = localStorage.getItem('token');
+    const userData = localStorage.getItem('user');
+    console.log("Token no localStorage:", token);
+    console.log("User no localStorage:", userData);
+  }, []);
+
+  // Filtrar motoristas por busca (sem filtro de status, pois só mostra disponíveis)
+  const handleSearch = useCallback(
+    (term) => {
+      let filtered = motoristas.filter(
+        (motorista) =>
+          motorista.nome.toLowerCase().includes(term.toLowerCase()) ||
+          motorista.email.toLowerCase().includes(term.toLowerCase())
+      );
+
+      setFilteredMotoristas(filtered);
+    },
+    [motoristas]
+  );
+
+  useEffect(() => {
+    handleSearch(searchTerm);
+  }, [searchTerm, handleSearch]);
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case "livre":
+        return "text-green-600 bg-green-100";
+      case "em-frete":
+        return "text-blue-600 bg-blue-100";
+      case "indisponivel":
+        return "text-red-600 bg-red-100";
+      default:
+        return "text-gray-600 bg-gray-100";
+    }
   };
 
-  const abrirOfertaFrete = (motorista) => {
-    setMotoristaSelecionado(motorista);
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case "livre":
+        return CheckCircle;
+      case "em-frete":
+        return Clock;
+      default:
+        return AlertCircle;
+    }
+  };
+
+  const getStatusText = (status) => {
+    switch (status) {
+      case "livre":
+        return "Disponível";
+      case "em-frete":
+        return "Em Frete";
+      case "indisponivel":
+        return "Indisponível";
+      default:
+        return "Desconhecido";
+    }
+  };
+
+  // Carregar fretes pendentes da empresa
+  const loadFretes = async () => {
+    const currentEmpresaId = empresaId || user?.empresa?.id || 1;
+    setLoadingFretes(true);
+
+    try {
+      const response = await apiService.get(`/api/fretes/empresa/${currentEmpresaId}`);
+
+      if (response.success) {
+        // Pegar apenas fretes pendentes
+        setFretes(response.fretes.pendentes || []);
+      } else {
+        setError("Erro ao carregar fretes");
+      }
+    } catch (err) {
+      console.error("Erro ao buscar fretes:", err);
+      setError("Erro ao conectar com o servidor");
+    } finally {
+      setLoadingFretes(false);
+    }
+  };
+
+  // Abrir modal de oferta de frete
+  const ofereceFreteMotorista = async (motoristaId) => {
+    const motorista = motoristas.find(m => m.id === motoristaId);
+    setMotoristaSelected(motorista);
     setShowOfertaModal(true);
+    await loadFretes();
   };
 
-  const fecharOfertaModal = () => {
-    setShowOfertaModal(false);
-    setMotoristaSelecionado(null);
+  // Oferecer frete específico para o motorista
+  const oferecerFrete = async (freteId) => {
+    if (!motoristaSelected) return;
+
+    const currentEmpresaId = empresaId || user?.empresa?.id || 1;
+    setLoadingOferta(true);
+
+    try {
+      const response = await apiService.post(`/api/fretes/${freteId}/oferecer`, {
+        motoristaId: motoristaSelected.id,
+        empresaId: empresaId
+      });
+
+      if (response.success) {
+        setShowOfertaModal(false);
+        setMotoristaSelected(null);
+        // Recarregar lista de motoristas para atualizar status
+        await loadTerceirizados();
+        alert("Frete oferecido com sucesso!");
+      } else {
+        alert("Erro ao oferecer frete: " + response.error);
+      }
+    } catch (err) {
+      console.error("Erro ao oferecer frete:", err);
+      alert("Erro ao conectar com o servidor");
+    } finally {
+      setLoadingOferta(false);
+    }
   };
 
-  const enviarOferta = () => {
-    // Simular envio da oferta
-    alert(`Oferta enviada para ${motoristaSelecionado.nome}!`);
-    fecharOfertaModal();
+  // Carregar Google Maps quando mudar para visualização de mapa
+  useEffect(() => {
+    if (showMap && !map) {
+      loadGoogleMaps();
+    }
+  }, [showMap]);
+
+  // Carregar Google Maps Script
+  const loadGoogleMaps = () => {
+    if (window.google && window.google.maps) {
+      initializeMap();
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyDdcof_-ueqF-JxkAF9zplTr7l85U8-hSs&libraries=places`;
+    script.async = true;
+    script.defer = true;
+    script.onload = initializeMap;
+    document.head.appendChild(script);
   };
+
+  // Inicializar mapa
+  const initializeMap = async () => {
+    if (!window.google || !mapRef.current) return;
+
+    setLoadingMap(true);
+    try {
+      // Buscar localização da empresa
+      const empresaCoords = await buscarLocalizacaoEmpresa();
+
+      const mapOptions = {
+        center: empresaCoords || { lat: -23.5505, lng: -46.6333 },
+        zoom: 13,
+        mapTypeId: window.google.maps.MapTypeId.ROADMAP,
+      };
+
+      const googleMap = new window.google.maps.Map(mapRef.current, mapOptions);
+      setMap(googleMap);
+
+      if (empresaCoords) {
+        console.log('🏢 Adicionando marcador da empresa em:', empresaCoords);
+
+        // Adicionar marcador da empresa (ícone simples)
+        const empresaMarker = new window.google.maps.Marker({
+          position: empresaCoords,
+          map: googleMap,
+          title: `🏢 ${user?.nome_empresa || 'Sua Empresa'}`,
+          icon: {
+            path: window.google.maps.SymbolPath.CIRCLE,
+            scale: 15,
+            fillColor: '#3B82F6',
+            fillOpacity: 1,
+            strokeColor: '#ffffff',
+            strokeWeight: 3,
+          },
+          label: {
+            text: '🏢',
+            fontSize: '16px',
+            color: 'white'
+          }
+        });
+
+        console.log('✅ Marcador da empresa criado:', empresaMarker);
+
+        // Adicionar InfoWindow para empresa
+        const empresaInfoWindow = new window.google.maps.InfoWindow({
+          content: `
+            <div style="padding: 10px; max-width: 200px;">
+              <h3 style="margin: 0 0 10px 0; color: #333;">🏢 ${user?.nome_empresa || 'Sua Empresa'}</h3>
+              <p style="margin: 5px 0; color: #666; font-size: 14px;">
+                📍 Localização da empresa
+              </p>
+              <p style="margin: 5px 0; color: #666; font-size: 14px;">
+                👥 ${motoristas.length} motoristas próximos
+              </p>
+            </div>
+          `
+        });
+
+        empresaMarker.addListener('click', () => {
+          empresaInfoWindow.open(googleMap, empresaMarker);
+        });
+
+        // Adicionar marcadores dos motoristas
+        addMotoristaMarkers(googleMap);
+      } else {
+        console.log('❌ Não foi possível obter coordenadas da empresa');
+      }
+    } catch (error) {
+      console.error('Erro ao inicializar mapa:', error);
+    } finally {
+      setLoadingMap(false);
+    }
+  };
+
+  // Buscar localização da empresa
+  const buscarLocalizacaoEmpresa = async () => {
+    const currentEmpresaId = empresaId || user?.empresa?.id || 1;
+    console.log('🏢 Buscando localização da empresa ID:', currentEmpresaId);
+
+    try {
+      const response = await apiService.getEmpresaData(currentEmpresaId);
+      console.log('📍 Resposta da API empresa:', response);
+
+      if (response.success && response.empresa) {
+        const { latitude, longitude, cidade, estado, rua, numero, cep } = response.empresa;
+        console.log('🗺️ Dados da empresa:', response.empresa);
+
+        if (latitude && longitude) {
+          const coords = { lat: parseFloat(latitude), lng: parseFloat(longitude) };
+          console.log('✅ Coords cadastradas encontradas:', coords);
+          setEmpresaLocation(coords);
+          return coords;
+        }
+
+        // Se não tem coordenadas, tentar geocoding com endereço
+        if (cidade || cep || rua) {
+          console.log('📍 Tentando geocoding com endereço...');
+          const endereco = `${rua || ''} ${numero || ''}, ${cidade || ''}, ${estado || 'SP'}, Brasil`.trim();
+          console.log('🔍 Buscando:', endereco);
+
+          try {
+            const geocoder = new window.google.maps.Geocoder();
+            const result = await new Promise((resolve, reject) => {
+              geocoder.geocode({ address: endereco }, (results, status) => {
+                if (status === 'OK' && results[0]) {
+                  resolve(results[0].geometry.location);
+                } else {
+                  reject(new Error('Geocoding failed: ' + status));
+                }
+              });
+            });
+
+            const coords = { lat: result.lat(), lng: result.lng() };
+            console.log('✅ Geocoding bem-sucedido:', coords);
+            setEmpresaLocation(coords);
+
+            // Opcional: Salvar coordenadas no banco para próximas vezes
+            try {
+              await apiService.post(`/api/empresa/${currentEmpresaId}/coordenadas`, {
+                latitude: coords.lat,
+                longitude: coords.lng
+              });
+              console.log('💾 Coordenadas salvas no banco');
+            } catch (saveError) {
+              console.log('⚠️ Não foi possível salvar coordenadas:', saveError);
+            }
+
+            return coords;
+          } catch (geocodeError) {
+            console.error('❌ Erro no geocoding:', geocodeError);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('❌ Erro ao buscar localização da empresa:', error);
+    }
+
+    // Fallback - São Paulo
+    console.log('⚠️ Usando localização padrão (São Paulo)');
+    const fallbackCoords = { lat: -23.5505, lng: -46.6333 };
+    setEmpresaLocation(fallbackCoords);
+    return fallbackCoords;
+  };
+
+  // Adicionar marcadores dos motoristas no mapa
+  const addMotoristaMarkers = (googleMap) => {
+    console.log('🚛 Adicionando marcadores de motoristas:', motoristas.length);
+
+    motoristas.forEach((motorista, index) => {
+      if (motorista.latitude && motorista.longitude) {
+        console.log(`🚛 Motorista ${index + 1}:`, {
+          nome: motorista.nome,
+          lat: motorista.latitude,
+          lng: motorista.longitude
+        });
+
+        const marker = new window.google.maps.Marker({
+          position: {
+            lat: parseFloat(motorista.latitude),
+            lng: parseFloat(motorista.longitude),
+          },
+          map: googleMap,
+          title: `🚛 ${motorista.nome} - ${parseFloat(motorista.distancia_km).toFixed(1)}km`,
+          icon: {
+            path: window.google.maps.SymbolPath.CIRCLE,
+            scale: 12,
+            fillColor: '#10B981',
+            fillOpacity: 1,
+            strokeColor: '#ffffff',
+            strokeWeight: 2,
+          },
+          label: {
+            text: '🚛',
+            fontSize: '14px',
+            color: 'white'
+          }
+        });
+
+        // Adicionar InfoWindow com detalhes do motorista
+        const infoWindow = new window.google.maps.InfoWindow({
+          content: `
+            <div style="padding: 10px; max-width: 250px;">
+              <h3 style="margin: 0 0 10px 0; color: #333;">${motorista.nome}</h3>
+              <p style="margin: 5px 0; color: #666; font-size: 14px;">
+                📧 ${motorista.email}
+              </p>
+              <p style="margin: 5px 0; color: #666; font-size: 14px;">
+                📍 ${parseFloat(motorista.distancia_km).toFixed(1)}km de distância
+              </p>
+              <p style="margin: 5px 0; color: #666; font-size: 14px;">
+                📊 ${motorista.total_fretes_concluidos} fretes concluídos
+              </p>
+              <div style="margin-top: 10px;">
+                <span style="background: #10B981; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">
+                  ✅ Disponível
+                </span>
+              </div>
+            </div>
+          `
+        });
+
+        marker.addListener('click', () => {
+          infoWindow.open(googleMap, marker);
+        });
+      }
+    });
+  };
+
+  // Atualizar marcadores quando lista de motoristas mudar
+  useEffect(() => {
+    if (map && motoristas.length > 0) {
+      addMotoristaMarkers(map);
+    }
+  }, [motoristas, map]);
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: "#F7F9FA" }}>
-      <Header companyName="Transportes Silva & Cia" />
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Barra de busca e filtros */}
-        <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
-          <div className="flex flex-col lg:flex-row gap-4">
-            {/* Campos de busca principais */}
-            <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="relative">
-                <FiMapPin className="absolute left-3 top-3 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Cidade de origem"
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  value={filtros.origem}
-                  onChange={(e) =>
-                    setFiltros({ ...filtros, origem: e.target.value })
-                  }
-                />
-              </div>
+    <div className="min-h-screen bg-gray-50">
+      <Header />
 
-              <div className="relative">
-                <FiMapPin className="absolute left-3 top-3 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Cidade de destino"
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  value={filtros.destino}
-                  onChange={(e) =>
-                    setFiltros({ ...filtros, destino: e.target.value })
-                  }
-                />
-              </div>
-            </div>
-
-            {/* Botões de ação */}
-            <div className="flex gap-2">
-              <button
-                onClick={() => setMostrarFiltros(!mostrarFiltros)}
-                className="flex items-center px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                <FiFilter className="mr-2" />
-                Filtros
-              </button>
-
-              <button className="flex items-center px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                <FiSearch className="mr-2" />
-                Buscar
-              </button>
-            </div>
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        {/* Cabeçalho */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              Motoristas Próximos
+            </h1>
+            <p className="text-gray-600">
+              Encontre motoristas disponíveis próximos para oferecer fretes
+            </p>
           </div>
 
-          {/* Filtros expandidos */}
-          {mostrarFiltros && (
-            <div className="mt-6 pt-6 border-t border-gray-200">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Tipo de Veículo
-                  </label>
-                  <select
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    value={filtros.tipoVeiculo}
-                    onChange={(e) =>
-                      setFiltros({ ...filtros, tipoVeiculo: e.target.value })
-                    }
-                  >
-                    <option value="">Todos</option>
-                    <option value="scania">Scania</option>
-                    <option value="volvo">Volvo</option>
-                    <option value="mercedes">Mercedes</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Mínimo de Eixos
-                  </label>
-                  <select
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    value={filtros.eixos}
-                    onChange={(e) =>
-                      setFiltros({ ...filtros, eixos: e.target.value })
-                    }
-                  >
-                    <option value="">Qualquer</option>
-                    <option value="2">2 eixos ou mais</option>
-                    <option value="3">3 eixos ou mais</option>
-                    <option value="4">4 eixos ou mais</option>
-                    <option value="5">5 eixos ou mais</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Raio de Busca: {filtros.raioKm}km
-                  </label>
-                  <input
-                    type="range"
-                    min="10"
-                    max="200"
-                    value={filtros.raioKm}
-                    onChange={(e) =>
-                      setFiltros({ ...filtros, raioKm: e.target.value })
-                    }
-                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
-                  />
-                </div>
-              </div>
+          <div className="flex space-x-3 mt-4 md:mt-0">
+            {/* Toggle Lista/Mapa */}
+            <div className="flex bg-gray-200 rounded-lg p-1">
+              <button
+                onClick={() => setShowMap(false)}
+                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center space-x-2 ${
+                  !showMap
+                    ? 'bg-white text-purple-600 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <List className="h-4 w-4" />
+                <span>Lista</span>
+              </button>
+              <button
+                onClick={() => setShowMap(true)}
+                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center space-x-2 ${
+                  showMap
+                    ? 'bg-white text-purple-600 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <Map className="h-4 w-4" />
+                <span>Mapa</span>
+              </button>
             </div>
-          )}
+
+            <button
+              onClick={loadMotoristasPróximos}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+            >
+              <Navigation className="h-4 w-4" />
+              <span>Atualizar Busca</span>
+            </button>
+          </div>
         </div>
 
-        {/* Resultados */}
-        <div className="bg-white rounded-xl shadow-sm">
-          <div className="p-6 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">
-              {motoristasFiltrados.length} motoristas encontrados
-            </h2>
+        {/* Exibir erro se houver */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+            <p className="text-red-600">{error}</p>
           </div>
+        )}
 
-          <div className="divide-y divide-gray-200">
-            {motoristasFiltrados.map((motorista) => (
-              <div
-                key={motorista.id}
-                className="p-6 hover:bg-gray-50 transition-colors"
+        {/* Filtros e Busca */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-8">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:space-x-4 space-y-4 lg:space-y-0">
+            {/* Barra de busca */}
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+              <input
+                type="text"
+                placeholder="Buscar por nome ou email..."
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+
+            {/* Filtro de raio */}
+            <div className="flex items-center space-x-2">
+              <Navigation className="h-5 w-5 text-gray-400" />
+              <select
+                className="border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                value={selectedRaio}
+                onChange={(e) => setSelectedRaio(Number(e.target.value))}
               >
-                <div className="flex flex-col lg:flex-row gap-6">
-                  {/* Informações do motorista */}
-                  <div className="flex items-start gap-4 flex-1">
-                    <div className="relative">
-                      <img
-                        src={motorista.foto}
-                        alt={motorista.nome}
-                        className="w-16 h-16 rounded-full object-cover"
-                      />
-                      <div
-                        className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-2 border-white ${
-                          motorista.status === "online"
-                            ? "bg-green-400"
-                            : "bg-yellow-400"
-                        }`}
-                      />
-                    </div>
+                <option value={10}>10km</option>
+                <option value={20}>20km</option>
+                <option value={30}>30km</option>
+                <option value={50}>50km</option>
+                <option value={100}>100km</option>
+              </select>
+            </div>
+          </div>
+        </div>
 
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <h3 className="text-lg font-semibold text-gray-900">
+        {/* Visualização do Mapa ou Lista */}
+        {showMap ? (
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">
+                🗺️ Mapa - Empresa e Motoristas Próximos
+              </h3>
+              <div className="flex items-center space-x-4 text-sm text-gray-600">
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                  <span>🏢 Sua Empresa</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                  <span>🚛 Motoristas ({motoristas.length})</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="relative">
+              {loadingMap && (
+                <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10 rounded-xl">
+                  <div className="flex items-center space-x-3">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                    <span className="text-gray-600 font-medium">Carregando mapa...</span>
+                  </div>
+                </div>
+              )}
+
+              <div
+                ref={mapRef}
+                className="w-full h-96 rounded-xl border border-gray-200"
+                style={{ minHeight: '400px' }}
+              />
+            </div>
+
+            {!loadingMap && motoristas.length === 0 && (
+              <div className="text-center py-8 text-gray-500">
+                <Map className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                <p>Nenhum motorista para exibir no mapa</p>
+                <p className="text-sm">Busque motoristas próximos primeiro</p>
+              </div>
+            )}
+          </div>
+        ) : (
+          <>
+            {/* Lista de Motoristas */}
+            {loading ? (
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Carregando motoristas próximos...</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredMotoristas.map((motorista) => {
+              const StatusIcon = getStatusIcon(
+                motorista.status_disponibilidade
+              );
+              return (
+                <div
+                  key={motorista.id}
+                  className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow"
+                >
+                  {/* Header do Card */}
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
+                        <User className="h-6 w-6 text-purple-600" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-gray-900">
                           {motorista.nome}
                         </h3>
-                        <div className="flex items-center">
-                          <FiStar className="w-4 h-4 text-yellow-400 fill-current" />
-                          <span className="text-sm text-gray-600 ml-1">
-                            {motorista.avaliacao} ({motorista.totalAvaliacoes})
+                        <div className="flex items-center space-x-1 text-sm">
+                          <Navigation className="h-4 w-4 text-blue-400" />
+                          <span className="text-gray-600">
+                            {parseFloat(motorista.distancia_km).toFixed(1)}km
                           </span>
                         </div>
                       </div>
-
-                      <div className="flex items-center text-sm text-gray-600 mb-2">
-                        <FiMapPin className="w-4 h-4 mr-1" />
-                        {motorista.localizacao} • {motorista.distancia}km de
-                        distância
-                      </div>
-
-                      <div className="flex items-center text-sm text-green-600 mb-3">
-                        <FiCalendar className="w-4 h-4 mr-1" />
-                        {motorista.disponibilidade}
-                      </div>
-
-                      <div className="flex flex-wrap gap-2">
-                        {motorista.especialidades.map((esp) => (
-                          <span
-                            key={esp}
-                            className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full"
-                          >
-                            {esp}
-                          </span>
-                        ))}
-                      </div>
                     </div>
+
+                    {/* Status */}
+                    <span
+                      className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(
+                        motorista.status_disponibilidade
+                      )}`}
+                    >
+                      <StatusIcon className="h-3 w-3 mr-1" />
+                      {getStatusText(motorista.status_disponibilidade)}
+                    </span>
                   </div>
 
-                  {/* Informações do veículo */}
-                  <div className="lg:w-80 bg-gray-50 rounded-lg p-4">
-                    <div className="flex items-center mb-3">
-                      <FiTruck className="w-5 h-5 text-gray-600 mr-2" />
-                      <h4 className="font-medium text-gray-900">
-                        {motorista.veiculo.modelo}
-                      </h4>
+                  {/* Informações do Motorista */}
+                  <div className="space-y-2 mb-4">
+                    <div className="flex items-center text-sm text-gray-600">
+                      <Mail className="h-4 w-4 mr-2" />
+                      {motorista.email}
                     </div>
-
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div>
-                        <span className="text-gray-500">Placa:</span>
-                        <div className="font-medium">
-                          {motorista.veiculo.placa}
-                        </div>
-                      </div>
-                      <div>
-                        <span className="text-gray-500">Eixos:</span>
-                        <div className="font-medium">
-                          {motorista.veiculo.eixos}
-                        </div>
-                      </div>
-                      <div>
-                        <span className="text-gray-500">Capacidade:</span>
-                        <div className="font-medium">
-                          {motorista.veiculo.capacidade}
-                        </div>
-                      </div>
-                      <div>
-                        <span className="text-gray-500">Ano:</span>
-                        <div className="font-medium">
-                          {motorista.veiculo.ano}
-                        </div>
-                      </div>
+                    <div className="flex items-center text-sm text-gray-600">
+                      <User className="h-4 w-4 mr-2" />
+                      Usuário: {motorista.usuario}
                     </div>
-
-                    <div className="mt-3 pt-3 border-t border-gray-200">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-500">Preço:</span>
-                        <span className="text-lg font-bold text-green-600">
-                          {motorista.preco}
-                        </span>
+                    <div className="flex items-center text-sm text-gray-600">
+                      <Truck className="h-4 w-4 mr-2" />
+                      Código: {motorista.codigo}
+                    </div>
+                    {motorista.telefone && (
+                      <div className="flex items-center text-sm text-gray-600">
+                        <Phone className="h-4 w-4 mr-2" />
+                        Telefone: {motorista.telefone}
                       </div>
+                    )}
+                  </div>
+
+                  {/* Estatísticas */}
+                  <div className="flex justify-between text-center border-t pt-4">
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">
+                        {motorista.total_fretes_concluidos}
+                      </p>
+                      <p className="text-xs text-gray-500">Fretes</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">
+                        {parseFloat(motorista.distancia_km).toFixed(1)}km
+                      </p>
+                      <p className="text-xs text-gray-500">Distância</p>
                     </div>
                   </div>
 
                   {/* Ações */}
-                  <div className="flex lg:flex-col gap-2 lg:w-32">
+                  <div className="mt-4">
                     <button
-                      onClick={() => abrirPerfilMotorista(motorista)}
-                      className="flex-1 lg:flex-none flex items-center justify-center px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                      onClick={() => ofereceFreteMotorista(motorista.id)}
+                      className="w-full bg-purple-600 text-white py-2 px-3 rounded-lg hover:bg-purple-700 transition-colors text-sm"
+                      disabled={motorista.status_disponibilidade !== "livre"}
                     >
-                      <FiEye className="w-4 h-4 mr-2 lg:mr-0" />
-                      <span className="lg:hidden">Ver Perfil</span>
-                    </button>
-
-                    <button
-                      onClick={() => abrirOfertaFrete(motorista)}
-                      className="flex-1 lg:flex-none flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                    >
-                      <FiSend className="w-4 h-4 mr-2 lg:mr-0" />
-                      <span className="lg:hidden">Enviar Oferta</span>
+                      Oferecer Frete
                     </button>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
-        </div>
+        )}
+
+        {/* Mensagem quando não há resultados */}
+        {!loading && filteredMotoristas.length === 0 && (
+          <div className="text-center py-12">
+            <Navigation className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              Nenhum motorista terceirizado encontrado
+            </h3>
+            <p className="text-gray-600">
+              Não há motoristas disponíveis em um raio de 30km da sua empresa.
+            </p>
+            <button
+              onClick={loadMotoristasPróximos}
+              className="mt-4 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors"
+            >
+              Tentar Novamente
+            </button>
+          </div>
+        )}
+          </>
+        )}
+
+        {/* Modal de Oferecer Frete */}
+        {showOfertaModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-2xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden">
+              {/* Header do Modal */}
+              <div className="flex items-center justify-between p-6 border-b">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">
+                    Oferecer Frete
+                  </h2>
+                  <p className="text-gray-600">
+                    Para: {motoristaSelected?.nome} ({motoristaSelected?.codigo})
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowOfertaModal(false);
+                    setMotoristaSelected(null);
+                  }}
+                  className="p-2 hover:bg-gray-100 rounded-lg"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* Conteúdo do Modal */}
+              <div className="p-6 overflow-y-auto">
+                {loadingFretes ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto mb-4"></div>
+                    <p className="text-gray-600">Carregando fretes...</p>
+                  </div>
+                ) : fretes.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Package className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">
+                      Nenhum frete disponível
+                    </h3>
+                    <p className="text-gray-600">
+                      Não há fretes pendentes para oferecer.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <h3 className="font-medium text-gray-900 mb-4">
+                      Selecione um frete para oferecer:
+                    </h3>
+
+                    {fretes.map((frete) => (
+                      <div
+                        key={frete.id}
+                        className="border border-gray-200 rounded-lg p-4 hover:border-purple-300 transition-colors"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-2 mb-2">
+                              <MapPin className="h-4 w-4 text-gray-500" />
+                              <span className="text-sm text-gray-600">
+                                {frete.origem} → {frete.destino}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center space-x-4 text-sm text-gray-600 mb-3">
+                              <div className="flex items-center space-x-1">
+                                <Package className="h-4 w-4" />
+                                <span>{frete.tipo_carga}</span>
+                              </div>
+                              <div className="flex items-center space-x-1">
+                                <DollarSign className="h-4 w-4" />
+                                <span>R$ {parseFloat(frete.valor).toFixed(2)}</span>
+                              </div>
+                              {frete.peso && (
+                                <div className="flex items-center space-x-1">
+                                  <Truck className="h-4 w-4" />
+                                  <span>{frete.peso}</span>
+                                </div>
+                              )}
+                            </div>
+
+                            {frete.observacoes && (
+                              <p className="text-sm text-gray-600 mb-3">
+                                <strong>Obs:</strong> {frete.observacoes}
+                              </p>
+                            )}
+                          </div>
+
+                          <button
+                            onClick={() => oferecerFrete(frete.id)}
+                            disabled={loadingOferta}
+                            className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {loadingOferta ? "Oferecendo..." : "Oferecer"}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
-
-      {/* Modal Perfil do Motorista */}
-      {motoristaSelecionado && !showOfertaModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-200">
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl font-semibold text-gray-900">
-                  Perfil do Motorista
-                </h2>
-                <button
-                  onClick={fecharPerfilMotorista}
-                  className="text-gray-500 hover:text-gray-700"
-                >
-                  ✕
-                </button>
-              </div>
-            </div>
-
-            <div className="p-6">
-              <div className="flex items-center gap-4 mb-6">
-                <img
-                  src={motoristaSelecionado.foto}
-                  alt={motoristaSelecionado.nome}
-                  className="w-20 h-20 rounded-full object-cover"
-                />
-                <div>
-                  <h3 className="text-2xl font-bold text-gray-900">
-                    {motoristaSelecionado.nome}
-                  </h3>
-                  <div className="flex items-center gap-4 mt-1">
-                    <div className="flex items-center">
-                      <FiStar className="w-5 h-5 text-yellow-400 fill-current" />
-                      <span className="ml-1 font-medium">
-                        {motoristaSelecionado.avaliacao}
-                      </span>
-                      <span className="text-gray-500 ml-1">
-                        ({motoristaSelecionado.totalAvaliacoes} avaliações)
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <h4 className="font-semibold text-gray-900 mb-3">
-                    Informações de Contato
-                  </h4>
-                  <div className="space-y-2">
-                    <div className="flex items-center">
-                      <FiPhone className="w-4 h-4 text-gray-500 mr-3" />
-                      <span>{motoristaSelecionado.telefone}</span>
-                    </div>
-                    <div className="flex items-center">
-                      <FiMapPin className="w-4 h-4 text-gray-500 mr-3" />
-                      <span>{motoristaSelecionado.localizacao}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <h4 className="font-semibold text-gray-900 mb-3">
-                    Atividade Recente
-                  </h4>
-                  <div className="space-y-2">
-                    <div className="flex items-center">
-                      <FiCalendar className="w-4 h-4 text-gray-500 mr-3" />
-                      <span>
-                        Última viagem: {motoristaSelecionado.ultimaViagem}
-                      </span>
-                    </div>
-                    <div className="flex items-center">
-                      <FiDollarSign className="w-4 h-4 text-gray-500 mr-3" />
-                      <span>Preço médio: {motoristaSelecionado.preco}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-6">
-                <h4 className="font-semibold text-gray-900 mb-3">
-                  Especialidades
-                </h4>
-                <div className="flex flex-wrap gap-2">
-                  {motoristaSelecionado.especialidades.map((esp) => (
-                    <span
-                      key={esp}
-                      className="px-3 py-1 bg-blue-100 text-blue-700 text-sm rounded-full"
-                    >
-                      {esp}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              <div className="mt-6 pt-6 border-t border-gray-200">
-                <div className="flex gap-3">
-                  <button
-                    onClick={fecharPerfilMotorista}
-                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    Fechar
-                  </button>
-                  <button
-                    onClick={() => {
-                      fecharPerfilMotorista();
-                      abrirOfertaFrete(motoristaSelecionado);
-                    }}
-                    className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                  >
-                    Enviar Oferta
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal Oferta de Frete */}
-      {showOfertaModal && motoristaSelecionado && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl max-w-lg w-full">
-            <div className="p-6 border-b border-gray-200">
-              <h2 className="text-xl font-semibold text-gray-900">
-                Enviar Oferta para {motoristaSelecionado.nome}
-              </h2>
-            </div>
-
-            <div className="p-6">
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Origem
-                    </label>
-                    <input
-                      type="text"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                      placeholder="Santos, SP"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Destino
-                    </label>
-                    <input
-                      type="text"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                      placeholder="São Paulo, SP"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Valor Oferecido
-                    </label>
-                    <input
-                      type="text"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                      placeholder="R$ 1.500,00"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Data de Coleta
-                    </label>
-                    <input
-                      type="date"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Descrição da Carga
-                  </label>
-                  <textarea
-                    rows="3"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    placeholder="Descreva o tipo de carga, peso, dimensões..."
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Observações
-                  </label>
-                  <textarea
-                    rows="2"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    placeholder="Informações adicionais..."
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="p-6 bg-gray-50 rounded-b-xl">
-              <div className="flex gap-3">
-                <button
-                  onClick={fecharOfertaModal}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={enviarOferta}
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  Enviar Oferta
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
 
-export default EncontrarMotorista;
+export default DriverPage;

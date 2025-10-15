@@ -17,16 +17,14 @@ import {
 import { useNavigate } from "react-router-dom";
 import { useUser } from "../contexts/UserContext";
 import apiService from "../services/apiService";
-import authService from "../services/authService";
 
 const RegisterPage = ({ onRegister }) => {
   const navigate = useNavigate();
-  const { register, login, loading, error, userData } = useUser();
+  const { register, login, loading, error, userData, empresaId } = useUser();
   const [currentStep, setCurrentStep] = useState(1);
   const [showPassword, setShowPassword] = useState(false);
   const [registerError, setRegisterError] = useState("");
-  const [autoLogin, setAutoLogin] = useState(true); // Para controlar se deve fazer login automático
-  const [loadingCep, setLoadingCep] = useState(false);
+  const [autoLogin, setAutoLogin] = useState(true);
 
   const [formData, setFormData] = useState({
     // Etapa 1
@@ -80,38 +78,6 @@ const RegisterPage = ({ onRegister }) => {
       ...prev,
       [name]: formattedValue,
     }));
-
-    // Se o CEP foi alterado e tem 9 caracteres (00000-000), buscar endereço
-    if (name === "zipCode" && formattedValue.length === 9) {
-      buscarEnderecoPorCep(formattedValue);
-    }
-  };
-
-  // Função para buscar endereço por CEP usando API ViaCEP
-  const buscarEnderecoPorCep = async (cep) => {
-    const cepLimpo = cep.replace(/\D/g, '');
-
-    if (cepLimpo.length !== 8) return;
-
-    setLoadingCep(true);
-    try {
-      const response = await fetch(`https://viacep.com.br/ws/${cepLimpo}/json/`);
-      const dados = await response.json();
-
-      if (!dados.erro) {
-        setFormData(prev => ({
-          ...prev,
-          street: dados.logradouro || prev.street,
-          neighborhood: dados.bairro || prev.neighborhood,
-          city: dados.localidade || prev.city,
-          state: dados.uf || prev.state
-        }));
-      }
-    } catch (error) {
-      console.error('Erro ao buscar CEP:', error);
-    } finally {
-      setLoadingCep(false);
-    }
   };
 
   const togglePasswordVisibility = () => {
@@ -162,48 +128,42 @@ const RegisterPage = ({ onRegister }) => {
           const loginResult = await login(formData.corporateEmail, formData.password);
 
           if (loginResult.success) {
-            // Precisamos obter o user data diretamente do resultado do login
-            // porque o userData do contexto demora para atualizar
+            // Login bem-sucedido - agora salvar dados opcionais usando EXATAMENTE a mesma API que funciona no EmpresaScreen
+            const dadosOpcionais = {
+              nome_empresa: formData.companyName,
+              email_corporativo: formData.corporateEmail,
+              telefone: formData.contactPhone,
+              cep: formData.zipCode || null,
+              rua: formData.street || null,
+              numero: formData.number || null,
+              complemento: formData.complement || null,
+              bairro: formData.neighborhood || null,
+              cidade: formData.city || null,
+              estado: formData.state || null
+            };
 
-            // Fazer uma nova chamada para obter o user completo do authService
-            const currentUserData = authService.getUserData();
-            const empresaId = currentUserData?.empresa_id || currentUserData?.id;
+            // Usar empresaId do contexto após login (como no EmpresaScreen)
+            try {
+              console.log("Salvando dados opcionais usando empresaId do contexto...");
+              console.log("empresaId do contexto:", empresaId);
+              console.log("Dados opcionais:", dadosOpcionais);
 
-            console.log("currentUserData do localStorage:", currentUserData);
-            console.log("empresaId:", empresaId);
+              // Se o contexto ainda não tem empresaId, usar o ID retornado do login
+              const idParaSalvar = empresaId || loginResult.user?.empresa_id || loginResult.user?.id;
 
-            if (empresaId) {
-              // Agora salvar dados opcionais usando a mesma API que funciona no EmpresaScreen
-              const dadosOpcionais = {
-                nomeEmpresa: formData.companyName,
-                emailCorporativo: formData.corporateEmail,
-                telefone: formData.contactPhone,
-                cep: formData.zipCode || null,
-                rua: formData.street || null,
-                numero: formData.number || null,
-                complemento: formData.complement || null,
-                bairro: formData.neighborhood || null,
-                cidade: formData.city || null,
-                estado: formData.state || null
-              };
-
-              // Usar a mesma API que funciona no EmpresaScreen
-              try {
-                console.log("Salvando dados opcionais:", dadosOpcionais);
-                await apiService.updateEmpresaData(empresaId, dadosOpcionais);
-              console.log("Dados opcionais salvos com sucesso!");
+              if (idParaSalvar) {
+                await apiService.updateEmpresaData(idParaSalvar, dadosOpcionais);
+                console.log("Dados opcionais salvos com sucesso!");
+              } else {
+                console.warn("Nenhum ID válido encontrado para salvar dados opcionais");
+              }
             } catch (updateError) {
               console.error("Erro ao salvar dados opcionais:", updateError);
               // Não falhar o registro por causa disso, apenas avisar
             }
 
-              // Redirecionar para empresa screen
-              navigate("/empresa");
-            } else {
-              console.error("EmpresaId não encontrado após login");
-              // Redirecionar mesmo assim
-              navigate("/empresa");
-            }
+            // Redirecionar para empresa screen
+            navigate("/empresa");
           } else {
             // Se falhou o login automático, redirecionar para login manual
             navigate("/login", {
@@ -556,27 +516,18 @@ const RegisterPage = ({ onRegister }) => {
             style={{ color: "#222222" }}
           >
             CEP
-            {loadingCep && <span className="text-xs text-blue-600 ml-2">Buscando...</span>}
           </label>
-          <div className="relative">
-            <input
-              name="zipCode"
-              type="text"
-              required
-              maxLength="9"
-              value={formData.zipCode}
-              onChange={handleInputChange}
-              className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 transition-all duration-200 text-sm"
-              style={{ borderColor: "#E5E7EB", color: "#222222" }}
-              placeholder="00000-000"
-              disabled={loadingCep}
-            />
-            {loadingCep && (
-              <div className="absolute right-3 top-3">
-                <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-600 border-t-transparent"></div>
-              </div>
-            )}
-          </div>
+          <input
+            name="zipCode"
+            type="text"
+            required
+            maxLength="9"
+            value={formData.zipCode}
+            onChange={handleInputChange}
+            className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 transition-all duration-200 text-sm"
+            style={{ borderColor: "#E5E7EB", color: "#222222" }}
+            placeholder="00000-000"
+          />
         </div>
       </div>
 
@@ -840,7 +791,7 @@ const RegisterPage = ({ onRegister }) => {
                 <p className="text-sm text-red-700">{registerError || error}</p>
               </div>
             )}
-            
+
             {currentStep === 1 && renderStep1()}
             {currentStep === 2 && renderStep2()}
             {currentStep === 3 && renderStep3()}

@@ -1,7 +1,9 @@
 // ApiService para comunicação com backend - WEB INTEGRADO COM FRETES
 class ApiService {
   constructor() {
-    this.baseURL = 'http://localhost:3000'; // Ajuste conforme seu backend
+    // Usa variável de ambiente ou fallback para localhost
+    this.baseURL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+    console.log('🚀 API Base URL:', this.baseURL);
   }
 
   // Método auxiliar para fazer requests
@@ -17,16 +19,39 @@ class ApiService {
     try {
       const response = await fetch(`${this.baseURL}${endpoint}`, config);
       const data = await response.json();
-      
+
       if (!response.ok) {
         throw new Error(data.error || 'Erro na requisição');
       }
-      
+
       return data;
     } catch (error) {
       console.error(`Erro na requisição para ${endpoint}:`, error);
       throw error;
     }
+  }
+
+  // Métodos HTTP básicos
+  async get(endpoint) {
+    return this.request(endpoint, { method: 'GET' });
+  }
+
+  async post(endpoint, data) {
+    return this.request(endpoint, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async put(endpoint, data) {
+    return this.request(endpoint, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async delete(endpoint) {
+    return this.request(endpoint, { method: 'DELETE' });
   }
 
   // ===================================
@@ -48,7 +73,7 @@ class ApiService {
   }
 
   async getEmpresaData(empresaId) {
-    return this.request(`/empresa/${empresaId}`);
+    return this.request(`/api/empresas/${empresaId}`);
   }
 
   // ===================================
@@ -57,7 +82,7 @@ class ApiService {
 
   // Criar novo frete
   async criarFrete(freteData) {
-    return this.request('/fretes', {
+    return this.request('/api/fretes', {
       method: 'POST',
       body: JSON.stringify(freteData)
     });
@@ -65,17 +90,17 @@ class ApiService {
 
   // Listar fretes da empresa (agrupados por status)
   async getFretes(empresaId) {
-    return this.request(`/fretes/empresa/${empresaId}`);
+    return this.request(`/api/fretes/empresa/${empresaId}`);
   }
 
   // Buscar frete específico
   async getFrete(freteId) {
-    return this.request(`/fretes/${freteId}`);
+    return this.request(`/api/fretes/${freteId}`);
   }
 
   // Atualizar frete
   async atualizarFrete(freteId, freteData) {
-    return this.request(`/fretes/${freteId}`, {
+    return this.request(`/api/fretes/${freteId}`, {
       method: 'PUT',
       body: JSON.stringify(freteData)
     });
@@ -83,7 +108,7 @@ class ApiService {
 
   // Deletar frete
   async deletarFrete(freteId, empresaId) {
-    return this.request(`/fretes/${freteId}`, {
+    return this.request(`/api/fretes/${freteId}`, {
       method: 'DELETE',
       body: JSON.stringify({ empresaId })
     });
@@ -91,7 +116,7 @@ class ApiService {
 
   // Oferecer frete para motorista
   async oferecerFrete(freteId, motoristaId, empresaId) {
-    return this.request(`/fretes/${freteId}/oferecer`, {
+    return this.request(`/api/fretes/${freteId}/oferecer`, {
       method: 'POST',
       body: JSON.stringify({ motoristaId, empresaId })
     });
@@ -99,7 +124,7 @@ class ApiService {
 
   // Finalizar frete
   async finalizarFrete(freteId, empresaId, finalizadoPor = 'Admin') {
-    return this.request(`/fretes/${freteId}/finalizar`, {
+    return this.request(`/api/fretes/${freteId}/finalizar`, {
       method: 'PUT',
       body: JSON.stringify({ empresaId, finalizadoPor })
     });
@@ -111,11 +136,11 @@ class ApiService {
 
   // Enviar convite para motorista por código
   async enviarConvite(empresaId, codigoMotorista) {
-    return this.request('/api/auth/convites', {
+    return this.request('/api/convites', {
       method: 'POST',
-      body: JSON.stringify({ 
-        empresaId, 
-        codigoMotorista: codigoMotorista.toUpperCase() 
+      body: JSON.stringify({
+        empresaId,
+        codigoMotorista: codigoMotorista.toUpperCase()
       })
     });
   }
@@ -141,12 +166,74 @@ class ApiService {
   }
 
   // ===================================
+  // SISTEMA DE COLABORADORES
+  // ===================================
+
+  // Listar colaboradores da empresa
+  async getColaboradores(empresaId) {
+    return this.request(`/api/auth/empresa/${empresaId}/colaboradores`);
+  }
+
+  // Criar novo colaborador
+  async criarColaborador(colaboradorData) {
+    return this.request('/api/auth/colaboradores', {
+      method: 'POST',
+      body: JSON.stringify(colaboradorData)
+    });
+  }
+
+  // Atualizar colaborador
+  async atualizarColaborador(colaboradorId, colaboradorData) {
+    return this.request(`/api/auth/colaboradores/${colaboradorId}`, {
+      method: 'PUT',
+      body: JSON.stringify(colaboradorData)
+    });
+  }
+
+  // Deletar colaborador
+  async deletarColaborador(colaboradorId) {
+    return this.request(`/api/auth/colaboradores/${colaboradorId}`, {
+      method: 'DELETE'
+    });
+  }
+
+  // Atualizar status de trabalho do colaborador
+  async atualizarStatusTrabalho(colaboradorId, statusTrabalho) {
+    return this.request(`/api/colaboradores/${colaboradorId}/status`, {
+      method: 'PUT',
+      body: JSON.stringify({ status_trabalho: statusTrabalho })
+    });
+  }
+
+  // ===================================
+  // SISTEMA DE EMPRESAS
+  // ===================================
+
+  // Obter dados da empresa
+  async getEmpresaData(empresaId) {
+    return this.request(`/api/empresas/${empresaId}`);
+  }
+
+  // Atualizar dados da empresa
+  async updateEmpresaData(empresaId, empresaData) {
+    return this.request(`/api/empresas/${empresaId}`, {
+      method: 'PUT',
+      body: JSON.stringify(empresaData)
+    });
+  }
+
+  // Obter estatísticas da empresa
+  async getEmpresaStats(empresaId) {
+    return this.request(`/api/empresas/${empresaId}/stats`);
+  }
+
+  // ===================================
   // ESTATÍSTICAS E RELATÓRIOS
   // ===================================
 
   // Buscar métricas do dashboard
   async getDashboardData(empresaId) {
-    return this.request(`/dashboard?empresaId=${empresaId}`);
+    return this.request(`/api/dashboard?empresaId=${empresaId}`);
   }
 
   // Relatório de fretes por período
@@ -156,7 +243,7 @@ class ApiService {
       dataInicio,
       dataFim
     });
-    return this.request(`/fretes/empresa/${empresaId}/relatorio?${params}`);
+    return this.request(`/api/fretes/empresa/${empresaId}/relatorio?${params}`);
   }
 
   // Estatísticas de motoristas
@@ -182,15 +269,20 @@ class ApiService {
 
   // Validação de CEP
   async validateCEP(cep) {
-    return this.request(`/utils/validate-cep/${cep}`);
+    return this.request(`/api/utils/validate-cep/${cep}`);
   }
 
-  // Calcular distância
-  async calculateDistance(origem, destino) {
-    return this.request('/utils/calculate-distance', {
+  // Calcular distância entre cidades
+  async calcularDistancia(origem, destino) {
+    return this.request('/api/fretes/calcular-distancia', {
       method: 'POST',
       body: JSON.stringify({ origem, destino })
     });
+  }
+
+  // Buscar dados de receita por período
+  async getReceitaPorPeriodo(empresaId, periodo = '6meses') {
+    return this.request(`/api/fretes/receita/${empresaId}?periodo=${periodo}`);
   }
 
   // ===================================
@@ -307,6 +399,44 @@ class ApiService {
   }
 
   // ===================================
+  // SISTEMA DE CANDIDATURAS
+  // ===================================
+
+  // Buscar candidaturas de um frete
+  async getCandidaturas(freteId) {
+    return this.request(`/api/candidaturas/frete/${freteId}`);
+  }
+
+  // Aprovar candidatura
+  async aprovarCandidatura(candidaturaId, observacoes = null) {
+    return this.request(`/api/candidaturas/${candidaturaId}/aprovar`, {
+      method: 'PUT',
+      body: JSON.stringify({ observacoes })
+    });
+  }
+
+  // Recusar candidatura
+  async recusarCandidatura(candidaturaId, observacoes = null) {
+    return this.request(`/api/candidaturas/${candidaturaId}/recusar`, {
+      method: 'PUT',
+      body: JSON.stringify({ observacoes })
+    });
+  }
+
+  // Contar candidaturas pendentes por frete
+  async contarCandidaturasPendentes(freteId) {
+    return this.request(`/api/candidaturas/frete/${freteId}/count`);
+  }
+
+  // Buscar candidaturas de múltiplos fretes (para badges)
+  async getCandidaturasFretes(freteIds) {
+    return this.request('/api/candidaturas/fretes/batch', {
+      method: 'POST',
+      body: JSON.stringify({ freteIds })
+    });
+  }
+
+  // ===================================
   // MÉTODOS LEGADOS (para compatibilidade)
   // ===================================
 
@@ -325,7 +455,7 @@ class ApiService {
   async deleteFrete(freteId) {
     // Nota: Este método precisa do empresaId, mas mantemos para compatibilidade
     console.warn('deleteFrete sem empresaId está depreciado. Use deletarFrete()');
-    return this.request(`/fretes/${freteId}`, {
+    return this.request(`/api/fretes/${freteId}`, {
       method: 'DELETE'
     });
   }
@@ -335,7 +465,7 @@ class ApiService {
   }
 
   async addMembroEquipe(empresaId, membroData) {
-    return this.request('/equipe', {
+    return this.request('/api/equipe', {
       method: 'POST',
       body: JSON.stringify({
         empresaId,
@@ -346,7 +476,7 @@ class ApiService {
 
   async searchMotoristas(filtros) {
     const queryParams = new URLSearchParams(filtros);
-    return this.request(`/motoristas/buscar?${queryParams}`);
+    return this.request(`/api/motoristas/buscar?${queryParams}`);
   }
 }
 
