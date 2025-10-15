@@ -103,8 +103,7 @@ export const useDriver = (motoristaId) => {
 
         // ✅ CONECTADO AO BACKEND - Endpoint existe
         const response = await fetch(
-          `${API_URL}
-/api/fretes/${freteId}/aceitar`,
+          `${API_URL}/api/fretes/${freteId}/aceitar`,
           {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
@@ -150,8 +149,7 @@ export const useDriver = (motoristaId) => {
 
         // ✅ CONECTADO AO BACKEND - Endpoint existe
         const response = await fetch(
-          `${API_URL}
-/api/fretes/${freteId}/recusar`,
+          `${API_URL}/api/fretes/${freteId}/recusar`,
           {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
